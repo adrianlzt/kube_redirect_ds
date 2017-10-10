@@ -2,7 +2,6 @@ import re
 import os
 import falcon
 import requests
-from wsgiref import simple_server
 from functools import lru_cache
 
 import logging
@@ -87,7 +86,3 @@ def get_redirect(node):
 application = falcon.API()
 application.add_route('/{node}', Redirect())
 application.add_route('/clear', ClearCache())
-
-if __name__ == '__main__':
-    httpd = simple_server.make_server('127.0.0.1', 8000, application)
-    httpd.serve_forever()
