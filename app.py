@@ -21,6 +21,14 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", logging.INFO)
 # Define log level (DEBUG=10, INFO=20, WARNING=30)
 logger.setLevel(int(LOG_LEVEL))
 
+class Health(object):
+    """
+    To be used by health checks
+    """
+    def on_get(self, req, resp):
+        logger.debug("health request")
+        resp.status = falcon.HTTP_200
+
 class ClearCache(object):
     """
     Clear the LRU cache. Force to ask to kubernetes next time
@@ -86,3 +94,4 @@ def get_redirect(node):
 application = falcon.API()
 application.add_route('/{node}', Redirect())
 application.add_route('/clear', ClearCache())
+application.add_route('/health', Health())
