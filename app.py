@@ -37,9 +37,9 @@ class Redirect(object):
 
         ex = get_redirect(node)
         cache_info = get_redirect.cache_info()
-        logger.debug(f"cache_info: {cache_info}")
+        logger.debug("cache_info: %s" % str(cache_info))
         if cache_info.hits > MAX_HITS:
-            logger.info(f"Clearing the cache after {MAX_HITS} hits")
+            logger.info("Clearing the cache after %s hits" % MAX_HITS)
             get_redirect.cache_clear()
 
         raise ex
@@ -53,33 +53,33 @@ def get_redirect(node):
 
     Returning Exceptions instead of raising to be able to use lru_cache
     """
-    headers = {"Authorization": f"Bearer {KUBERNETES_TOKEN}"}
-    url = f"{KUBERNETES_URL}/api/v1/namespaces/logging/pods?labelSelector=component=fluentd"
-    logger.debug(f"Requesting pods to kubernetes. url={url}, headers={headers}")
+    headers = {"Authorization": "Bearer %s" % KUBERNETES_TOKEN}
+    url = "%s/api/v1/namespaces/logging/pods?labelSelector=component=fluentd" % KUBERNETES_URL
+    logger.debug("Requesting pods to kubernetes. url=%s, headers=%s" % (url, headers))
     r = requests.get(url, headers=headers, verify=False)
     if not r.ok:
-        logger.warn(f"Error requesting pods from kubernetes: {r.body}")
+        logger.warn("Error requesting pods from kubernetes: %s" % r.body)
         return falcon.HTTPInternalServerError(title="Error requesting pods from kubernetes")
 
     pods = r.json()
-    logger.debug(f"Number of pods obtained: {len(pods)}")
+    logger.debug("Number of pods obtained: %s" % len(pods.get("items")))
     name = None
 
-    logger.debug(f"Looking for a pod in node {node}")
+    logger.debug("Looking for a pod in node %s" % node)
     for pod in pods.get("items"):
         nodeName = pod.get("spec").get("nodeName")
-        logger.debug(f"Comparing to {nodeName}")
+        logger.debug("Comparing to %s" % nodeName)
 
-        if re.match(f"(?i){node}.*", nodeName):
+        if re.match("(?i)%s.*" % node, nodeName):
             name = pod.get("metadata").get("name")
             ip = pod.get("status").get("podIP")
-            logger.debug(f"Match. Pod name: {name}, IP: {ip}")
+            logger.debug("Match. Pod name: %s, IP: %s" % (name,ip))
             break
         else:
             continue
 
     if name:
-        return falcon.HTTPFound(f"http://{ip}:24220/api/plugins.json")
+        return falcon.HTTPFound("http://%s:24220/api/plugins.json" % ip)
 
     return falcon.HTTPNotFound(title="Not found fluentd pod for that node")
 
