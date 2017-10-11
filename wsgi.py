@@ -48,7 +48,7 @@ class Redirect(object):
     """
     def on_get(self, req, resp, node):
         if not node:
-            raise falcon.HTTPBadRequest(title="Missing parameter")
+            raise falcon.HTTPBadRequest(title="Missing node")
 
         ex = get_redirect(node)
         cache_info = get_redirect.cache_info()

@@ -1,0 +1,116 @@
+---
+apiVersion: v1
+kind: Template
+metadata:
+  name: kube-redirect-ds
+objects:
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: "${NAME}"
+  stringData:
+    auth-token: "${AUTH_TOKEN}"
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+  spec:
+    ports:
+    - port: 80
+      targetPort: 8080
+    selector:
+      deploymentconfig: "${NAME}"
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+  spec:
+    replicas: 1
+    selector:
+      deploymentconfig: "${NAME}"
+    template:
+      metadata:
+        labels:
+          deploymentconfig: "${NAME}"
+      spec:
+        containers:
+        - name: kube-redirect-ds
+          image: "${DOCKER_IMAGE}"
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          env:
+          - name: MAX_HITS
+            value: "${MAX_HITS}"
+          - name: KUBERNETES_URL
+            value: "${KUBERNETES_URL}"
+          - name: LOG_LEVEL
+            value: "${LOG_LEVEL}"
+          - name: LRU_CACHE
+            value: "${LRU_CACHE}"
+          - name: NAMESPACE
+            value: "${NAMESPACE}"
+          - name: LABEL_SELECTOR
+            value: "${LABEL_SELECTOR}"
+          - name: REDIRECT
+            value: "${REDIRECT}"
+          - name: KUBERNETES_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: auth-token
+                name: "${NAME}"
+          readinessProbe:
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+            httpGet:
+              port: 8080
+              path: "/health"
+          livenessProbe:
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+            httpGet:
+              port: 8080
+              path: "/health"
+    triggers:
+    - type: ConfigChange
+parameters:
+- name: NAME
+  displayName: Name
+  description: Name used for objects deployed
+  required: true
+- name: NAMESPACE
+  displayName: Daemon Set Namespace
+  description: Name of the namespace where Daemon Set is defined
+  required: true
+- name: LABEL_SELECTOR
+  displayName: Label Selector
+  description: Selector of which pods should be routed to
+  required: true
+- name: REDIRECT
+  displayName: Redirect url
+  description: Format of the URL to redirect to. {} will be substituted by the POD's IP
+  required: true
+- name: AUTH_TOKEN
+  displayName: Token
+  description: Token to query Openshift for pods in the namespace provided
+  required: true
+- name: KUBERNETES_URL
+  displayName: Kubernetes URL
+  description: Openshift URL for inside kubernetes endpoint. Default should work
+  value: "https://kubernetes.default.svc.cluster.local"
+- name: MAX_HITS
+  displayName: Max Hits
+  description: Number of requests to be cached before asking again to Openshift
+  value: "40"
+- name: LOG_LEVEL
+  displayName: Log level
+  description: Log level of the application (numeric value of Logging Levels in python)
+  value: "10"
+- name: LRU_CACHE
+  displayName: Cache size
+  description: Size of the cache for requests. Should be higher that the number of nodes in the cluster (powers of two)
+  value: "16"
+- name: DOCKER_IMAGE
+  displayName: Docker image
+  description: Docker image to be deployed
+  value: "adrianlzt/kube_redirect_ds:latest"
