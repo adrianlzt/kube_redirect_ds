@@ -13,16 +13,16 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # ENV vars
-MAX_HITS = os.getenv("MAX_HITS", 20) # One query to kubernetes each MAX_HITS
+MAX_HITS = int(os.getenv("MAX_HITS", 20)) # One query to kubernetes each MAX_HITS
 KUBERNETES_URL = os.getenv("KUBERNETES_URL", "https://kubernetes.default.svc.cluster.local")
 KUBERNETES_TOKEN = os.getenv("KUBERNETES_TOKEN")
-LOG_LEVEL = os.getenv("LOG_LEVEL", logging.INFO) # DEBUG=10, INFO=20, WARNING=30
-LRU_CACHE = os.getenv("LRU_CACHE", 16) # Best in powers of two
+LOG_LEVEL = int(os.getenv("LOG_LEVEL", logging.INFO)) # DEBUG=10, INFO=20, WARNING=30
+LRU_CACHE = int(os.getenv("LRU_CACHE", 16)) # Best in powers of two
 NAMESPACE = os.getenv("NAMESPACE", "logging") # Kubernetes namespace where to find pods
 LABELSELECTOR = os.getenv("LABELSELECTOR", "component=fluentd") # Label to match only certains pods
-REDIRECT = os.getenv("REDIRECT", "http://{}:24220/api/plugins.json") # URL to redirect, {} will be substituted by pod IP
+REDIRECT = os.getenv("REDIRECT", "http://{}:24220/api/plugins.json") # URL to redirect, {} will be substituted by pod's IP
 
-logger.setLevel(int(LOG_LEVEL))
+logger.setLevel(LOG_LEVEL)
 
 class Health(object):
     """
