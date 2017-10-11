@@ -15,7 +15,7 @@ Example of execution tu monitor fluent agent pods:
 oc process -f openshift.yaml NAME="fluentd-monitoring" NAMESPACE="logging" LABEL_SELECTOR="component=fluentd" REDIRECT="http://{}:24220/api/plugins.json" AUTH_TOKEN="XXX" | oc create -f -
 ```
 
-## Using
+## Use
 Once deployed, we can test if it is working (app and this test should be in the same project of fluent agents):
 
 ```
