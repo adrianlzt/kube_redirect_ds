@@ -13,17 +13,20 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # ENV vars
-MAX_HITS = os.getenv("MAX_HITS", 4)
+MAX_HITS = os.getenv("MAX_HITS", 20) # One query to kubernetes each MAX_HITS
 KUBERNETES_URL = os.getenv("KUBERNETES_URL", "https://kubernetes.default.svc.cluster.local")
 KUBERNETES_TOKEN = os.getenv("KUBERNETES_TOKEN")
-LOG_LEVEL = os.getenv("LOG_LEVEL", logging.INFO)
+LOG_LEVEL = os.getenv("LOG_LEVEL", logging.INFO) # DEBUG=10, INFO=20, WARNING=30
+LRU_CACHE = os.getenv("LRU_CACHE", 16) # Best in powers of two
+NAMESPACE = os.getenv("NAMESPACE", "logging") # Kubernetes namespace where to find pods
+LABELSELECTOR = os.getenv("LABELSELECTOR", "component=fluentd") # Label to match only certains pods
+REDIRECT = os.getenv("REDIRECT", "http://{}:24220/api/plugins.json") # URL to redirect, {} will be substituted by pod IP
 
-# Define log level (DEBUG=10, INFO=20, WARNING=30)
 logger.setLevel(int(LOG_LEVEL))
 
 class Health(object):
     """
-    To be used by health checks
+    To be used by readiness and liveness checks
     """
     def on_get(self, req, resp):
         logger.debug("health request")
@@ -39,6 +42,10 @@ class ClearCache(object):
         get_redirect.cache_clear()
 
 class Redirect(object):
+    """
+    Main handler.
+    Return a HTTP redirect for a pod contained in the node specified
+    """
     def on_get(self, req, resp, node):
         if not node:
             raise falcon.HTTPBadRequest(title="Missing parameter")
@@ -52,19 +59,24 @@ class Redirect(object):
 
         raise ex
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=LRU_CACHE)
 def get_redirect(node):
     """
-    Obtain all pods from namespace logging.
-    Find the pod running in the node provided by parameter
-    Return a redirect to that pod, to the monitoring url
+    Obtain all pods from namespace provided filtered by label.
+    Return a redirect to that pod.
 
     Returning Exceptions instead of raising to be able to use lru_cache
     """
     headers = {"Authorization": "Bearer %s" % KUBERNETES_TOKEN}
-    url = "%s/api/v1/namespaces/logging/pods?labelSelector=component=fluentd" % KUBERNETES_URL
+    url = "%s/api/v1/namespaces/%s/pods?labelSelector=%s" % (KUBERNETES_URL, NAMESPACE, LABELSELECTOR)
     logger.debug("Requesting pods to kubernetes. url=%s, headers=%s" % (url, headers))
-    r = requests.get(url, headers=headers, verify=False)
+
+    try:
+        r = requests.get(url, headers=headers, verify=False)
+    except Exception as ex:
+        logger.warn("Error connecting to kubernetes: %s" % ex)
+        return falcon.HTTPInternalServerError(title="Error connecting to kubernetes")
+
     if not r.ok:
         logger.warn("Error requesting pods from kubernetes: %s" % r.body)
         return falcon.HTTPInternalServerError(title="Error requesting pods from kubernetes")
@@ -87,7 +99,7 @@ def get_redirect(node):
             continue
 
     if name:
-        return falcon.HTTPFound("http://%s:24220/api/plugins.json" % ip)
+        return falcon.HTTPFound(REDIRECT.format(ip))
 
     return falcon.HTTPNotFound(title="Not found fluentd pod for that node")
 
